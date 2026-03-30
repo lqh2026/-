@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商业问题智能分析系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 { font-size: 2.5rem; margin-bottom: 10px; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .header p { font-size: 1.1rem; opacity: 0.9; }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 30px;
+            align-items: start;
+        }
+
+        /* ── 对话框容器 ── */
+        .dialog-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .dialog-header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .dialog-header h2 { font-size: 1.5rem; }
+
+        /* API 状态徽章 */
+        .api-status { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #e74c3c;
+            flex-shrink: 0;
+        }
+        .status-dot.connected { background: #2ecc71; }
+
+        /* ── 输入区域 ── */
+        .input-section { padding: 30px; border-bottom: 1px solid #eee; }
+        .input-section label { display: block; margin-bottom: 10px; font-weight: 600; color: #2c3e50; }
+        .input-section textarea {
+            width: 100%; padding: 15px;
+            border: 2px solid #e0e0e0; border-radius: 8px;
+            font-size: 1rem; resize: vertical;
+            transition: border-color 0.3s;
+        }
+        .input-section textarea:focus { outline: none; border-color: #3498db; }
+        .input-actions { display: flex; gap: 10px; margin-top: 15px; }
+
+        /* ── 按钮 ── */
+        .btn {
+            padding: 12px 24px; border: none; border-radius: 6px;
+            font-size: 0.95rem; font-weight: 600; cursor: pointer;
+            transition: all 0.3s; display: flex; align-items: center; gap: 8px;
+        }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-primary:hover:not(:disabled) { background: #2980b9; transform: translateY(-2px); }
+        .btn-secondary { background: #95a5a6; color: white; }
+        .btn-secondary:hover { background: #7f8c8d; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-success:hover { background: #219a52; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; }
+
+        /* ── API 配置面板 ── */
+        .api-config-section { border-bottom: 1px solid #eee; }
+
+        .config-toggle {
+            padding: 15px 30px;
+            background: #f8f9fa;
+            cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center;
+            font-weight: 600; color: #2c3e50;
+            user-select: none;
+        }
+        .config-toggle:hover { background: #e9ecef; }
+        .toggle-arrow { transition: transform 0.3s; }
+        .toggle-arrow.open { transform: rotate(180deg); }
+
+        .config-content {
+            display: none;
+            padding: 24px 30px;
+            border-top: 1px solid #eee;
+        }
+        .config-content.open { display: block; }
+
+        /* 提供商标签页 */
+        .provider-tabs {
+            display: flex; gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .provider-tab {
+            padding: 8px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #666;
+            background: white;
+            transition: all 0.2s;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .provider-tab:hover { border-color: #3498db; color: #3498db; }
+        .provider-tab.active {
+            background: #3498db;
+            border-color: #3498db;
+            color: white;
+        }
+        .provider-tab .tab-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: currentColor;
+            opacity: 0.7;
+        }
+
+        /* 单个提供商的配置块 */
+        .provider-panel { display: none; }
+        .provider-panel.active { display: block; }
+
+        .config-form { display: flex; flex-direction: column; gap: 12px; }
+        .config-form label { font-weight: 600; color: #2c3e50; font-size: 0.9rem; }
+
+        .key-row { display: flex; gap: 8px; align-items: center; }
+        .key-row input {
+            flex: 1; padding: 10px;
+            border: 2px solid #e0e0e0; border-radius: 6px;
+            font-size: 0.95rem; font-family: monospace;
+        }
+        .key-row input:focus { outline: none; border-color: #3498db; }
+
+        .key-saved-badge {
+            font-size: 0.75rem; color: #27ae60;
+            font-weight: 600; white-space: nowrap;
+            display: none;
+        }
+        .key-saved-badge.visible { display: inline; }
+
+        .config-form select {
+            padding: 10px;
+            border: 2px solid #e0e0e0; border-radius: 6px;
+            font-size: 0.95rem; background: white;
+        }
+        .config-form select:focus { outline: none; border-color: #3498db; }
+
+        .config-hint {
+            font-size: 0.8rem; color: #888;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 3px solid #3498db;
+        }
+        .config-hint a { color: #3498db; }
+
+        .save-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+
+        /* ── 结果区域 ── */
+        .result-section { padding: 30px; }
+        .result-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px;
+        }
+        .result-header h3 { color: #2c3e50; }
+        .result-actions { display: flex; gap: 10px; }
+
+        .result-content {
+            background: #f8f9fa; border-radius: 8px;
+            padding: 20px; max-height: 420px; overflow-y: auto;
+            line-height: 1.7;
+        }
+        .result-content h4 { color: #2c3e50; margin: 15px 0 8px; }
+        .result-content h5 { color: #34495e; margin: 12px 0 6px; }
+        .result-content p { margin-bottom: 10px; }
+        .result-content ul, .result-content ol { margin-left: 20px; margin-bottom: 12px; }
+        .result-content li { margin-bottom: 4px; }
+        .result-content strong { color: #2c3e50; }
+        .result-content code {
+            background: #e8e8e8; padding: 2px 6px;
+            border-radius: 3px; font-family: monospace; font-size: 0.9em;
+        }
+
+        /* ── 侧边栏 ── */
+        .sidebar {
+            background: white; border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 20px; height: fit-content;
+        }
+        .sidebar h3 {
+            color: #2c3e50; margin-bottom: 15px;
+            padding-bottom: 10px; border-bottom: 2px solid #3498db;
+        }
+        .history-list { display: flex; flex-direction: column; gap: 10px; }
+        .history-item {
+            padding: 12px; background: #f8f9fa; border-radius: 6px;
+            cursor: pointer; transition: background 0.2s;
+            border-left: 3px solid #3498db;
+        }
+        .history-item:hover { background: #e9ecef; }
+        .history-item .question {
+            font-weight: 600; margin-bottom: 4px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            font-size: 0.9rem;
+        }
+        .history-item .meta {
+            font-size: 0.75rem; color: #7f8c8d;
+            display: flex; justify-content: space-between;
+        }
+        .history-item .provider-badge {
+            background: #3498db; color: white;
+            padding: 1px 7px; border-radius: 10px;
+            font-size: 0.7rem; font-weight: 600;
+        }
+
+        /* ── 模态框 ── */
+        .modal {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white; border-radius: 12px;
+            width: 90%; max-width: 640px; max-height: 80vh;
+            overflow: hidden; display: flex; flex-direction: column;
+        }
+        .modal-header {
+            background: #2c3e50; color: white; padding: 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            flex-shrink: 0;
+        }
+        .modal-header h3 { margin: 0; }
+        .close { font-size: 1.5rem; cursor: pointer; line-height: 1; }
+        .close:hover { opacity: 0.7; }
+        .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+
+        /* ── 加载动画 ── */
+        .loading-spinner {
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .loading-spinner::before {
+            content: '';
+            width: 16px; height: 16px;
+            border: 2px solid #ffffff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── 响应式 ── */
+        @media (max-width: 768px) {
+            .main-content { grid-template-columns: 1fr; gap: 20px; }
+            .header h1 { font-size: 2rem; }
+            .input-actions { flex-direction: column; }
+            .result-header { flex-direction: column; gap: 12px; align-items: flex-start; }
+            .result-actions { width: 100%; }
+            .provider-tab { font-size: 0.82rem; padding: 7px 12px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header class="header">
+        <h1>商业问题智能分析系统</h1>
+        <p>输入商业问题，获取精准分析并生成专业文档</p>
+    </header>
+
+    <div class="main-content">
+        <!-- ── 主对话框 ── -->
+        <div class="dialog-container">
+            <div class="dialog-header">
+                <h2>商业问题分析</h2>
+                <div class="api-status" id="apiStatus">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">未配置 API</span>
+                </div>
+            </div>
+
+            <div class="dialog-body">
+                <!-- 问题输入 -->
+                <div class="input-section">
+                    <label for="questionInput">请输入商业问题：</label>
+                    <textarea id="questionInput" rows="4"
+                        placeholder="例如：如何提高产品的市场占有率？&#10;当前面临的主要挑战是什么？&#10;未来的增长策略应该如何规划？"></textarea>
+                    <div class="input-actions">
+                        <button id="analyzeBtn" class="btn btn-primary">
+                            <span class="btn-text">开始分析</span>
+                            <span class="loading-spinner" style="display:none;">分析中...</span>
+                        </button>
+                        <button id="clearBtn" class="btn btn-secondary">清空</button>
+                    </div>
+                </div>
+
+                <!-- API 配置面板 -->
+                <div class="api-config-section">
+                    <div class="config-toggle" id="configToggle">
+                        <span>API 配置</span>
+                        <span class="toggle-arrow" id="toggleArrow">▼</span>
+                    </div>
+
+                    <div class="config-content" id="configContent">
+                        <!-- 提供商标签页 -->
+                        <div class="provider-tabs" id="providerTabs">
+                            <button class="provider-tab active" data-provider="openai">
+                                <span class="tab-dot"></span>OpenAI
+                            </button>
+                            <button class="provider-tab" data-provider="deepseek">
+                                <span class="tab-dot"></span>DeepSeek
+                            </button>
+                            <button class="provider-tab" data-provider="minimax">
+                                <span class="tab-dot"></span>MiniMax
+                            </button>
+                            <button class="provider-tab" data-provider="gemini">
+                                <span class="tab-dot"></span>Gemini
+                            </button>
+                        </div>
+
+                        <!-- OpenAI -->
+                        <div class="provider-panel active" id="panel-openai">
+                            <div class="config-form">
+                                <label>API Key</label>
+                                <div class="key-row">
+                                    <input type="password" id="key-openai" placeholder="sk-...">
+                                    <span class="key-saved-badge" id="badge-openai">✓ 已保存</span>
+                                </div>
+                                <label>模型</label>
+                                <select id="model-openai">
+                                    <option value="gpt-4o">GPT-4o</option>
+                                    <option value="gpt-4o-mini">GPT-4o mini</option>
+                                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                    <option value="gpt-4">GPT-4</option>
+                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                </select>
+                                <p class="config-hint">前往 <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a> 获取 API Key</p>
+                                <div class="save-row">
+                                    <button class="btn btn-primary" onclick="app.saveProvider('openai')">保存</button>
+                                    <button class="btn btn-secondary" onclick="app.useProvider('openai')">切换到此提供商</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DeepSeek -->
+                        <div class="provider-panel" id="panel-deepseek">
+                            <div class="config-form">
+                                <label>API Key</label>
+                                <div class="key-row">
+                                    <input type="password" id="key-deepseek" placeholder="sk-...">
+                                    <span class="key-saved-badge" id="badge-deepseek">✓ 已保存</span>
+                                </div>
+                                <label>模型</label>
+                                <select id="model-deepseek">
+                                    <option value="deepseek-chat">DeepSeek Chat (V3)</option>
+                                    <option value="deepseek-reasoner">DeepSeek Reasoner (R1)</option>
+                                </select>
+                                <p class="config-hint">前往 <a href="https://platform.deepseek.com/api_keys" target="_blank">platform.deepseek.com</a> 获取 API Key</p>
+                                <div class="save-row">
+                                    <button class="btn btn-primary" onclick="app.saveProvider('deepseek')">保存</button>
+                                    <button class="btn btn-secondary" onclick="app.useProvider('deepseek')">切换到此提供商</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- MiniMax -->
+                        <div class="provider-panel" id="panel-minimax">
+                            <div class="config-form">
+                                <label>API Key</label>
+                                <div class="key-row">
+                                    <input type="password" id="key-minimax" placeholder="eyJh...">
+                                    <span class="key-saved-badge" id="badge-minimax">✓ 已保存</span>
+                                </div>
+                                <label>模型</label>
+                                <select id="model-minimax">
+                                    <option value="MiniMax-Text-01">MiniMax-Text-01</option>
+                                    <option value="abab6.5s-chat">abab6.5s-chat</option>
+                                    <option value="abab5.5s-chat">abab5.5s-chat</option>
+                                </select>
+                                <p class="config-hint">前往 <a href="https://platform.minimaxi.com/user-center/basic-information/interface-key" target="_blank">platform.minimaxi.com</a> 获取 API Key</p>
+                                <div class="save-row">
+                                    <button class="btn btn-primary" onclick="app.saveProvider('minimax')">保存</button>
+                                    <button class="btn btn-secondary" onclick="app.useProvider('minimax')">切换到此提供商</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Gemini -->
+                        <div class="provider-panel" id="panel-gemini">
+                            <div class="config-form">
+                                <label>API Key</label>
+                                <div class="key-row">
+                                    <input type="password" id="key-gemini" placeholder="AIza...">
+                                    <span class="key-saved-badge" id="badge-gemini">✓ 已保存</span>
+                                </div>
+                                <label>模型</label>
+                                <select id="model-gemini">
+                                    <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                                    <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
+                                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                                    <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                                </select>
+                                <p class="config-hint">前往 <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a> 获取 API Key</p>
+                                <div class="save-row">
+                                    <button class="btn btn-primary" onclick="app.saveProvider('gemini')">保存</button>
+                                    <button class="btn btn-secondary" onclick="app.useProvider('gemini')">切换到此提供商</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 结果 -->
+                <div class="result-section" id="resultSection" style="display:none;">
+                    <div class="result-header">
+                        <h3>分析结果</h3>
+                        <div class="result-actions">
+                            <button id="exportMdBtn" class="btn btn-success">导出 Markdown</button>
+                            <button id="copyResultBtn" class="btn btn-secondary">复制</button>
+                        </div>
+                    </div>
+                    <div class="result-content" id="resultContent"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── 侧边栏 ── -->
+        <div class="sidebar">
+            <h3>历史记录</h3>
+            <div class="history-list" id="historyList"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 模态框 -->
+<div id="modal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">导出文档</h3>
+            <span class="close" id="closeModal">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="modalContent"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ────────────────────────────────────────────
+// 各提供商的 API 调用实现
+// ────────────────────────────────────────────
+
+const PROVIDERS = {
+    openai: {
+        label: 'OpenAI',
+        color: '#10a37f',
+        call: async (apiKey, model, messages) => {
+            const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({ model, messages, max_tokens: 2000, temperature: 0.7 })
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error?.message || `OpenAI 错误 ${res.status}`);
+            }
+            const data = await res.json();
+            return data.choices[0].message.content;
+        }
+    },
+
+    deepseek: {
+        label: 'DeepSeek',
+        color: '#1a6dcc',
+        call: async (apiKey, model, messages) => {
+            const res = await fetch('https://api.deepseek.com/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({ model, messages, max_tokens: 2000, temperature: 0.7 })
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error?.message || `DeepSeek 错误 ${res.status}`);
+            }
+            const data = await res.json();
+            return data.choices[0].message.content;
+        }
+    },
+
+    minimax: {
+        label: 'MiniMax',
+        color: '#7b2ff7',
+        call: async (apiKey, model, messages) => {
+            const res = await fetch('https://api.minimaxi.chat/v1/text/chatcompletion_v2', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model,
+                    messages,
+                    max_tokens: 2000,
+                    temperature: 0.7
+                })
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.base_resp?.status_msg || `MiniMax 错误 ${res.status}`);
+            }
+            const data = await res.json();
+            // MiniMax 返回格式
+            if (data.choices && data.choices[0]) {
+                return data.choices[0].message.content;
+            }
+            throw new Error('MiniMax 返回格式异常');
+        }
+    },
+
+    gemini: {
+        label: 'Gemini',
+        color: '#4285f4',
+        call: async (apiKey, model, messages) => {
+            // 将 OpenAI 格式的 messages 转为 Gemini 格式
+            const systemMsg = messages.find(m => m.role === 'system');
+            const userMsg   = messages.find(m => m.role === 'user');
+            const contents  = [];
+
+            // Gemini 用 system_instruction 传系统提示
+            const body = {
+                contents: [{ role: 'user', parts: [{ text: userMsg.content }] }],
+                generationConfig: { maxOutputTokens: 2000, temperature: 0.7 }
+            };
+            if (systemMsg) {
+                body.system_instruction = { parts: [{ text: systemMsg.content }] };
+            }
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error?.message || `Gemini 错误 ${res.status}`);
+            }
+            const data = await res.json();
+            return data.candidates[0].content.parts[0].text;
+        }
+    }
+};
+
+// ────────────────────────────────────────────
+// 主应用类
+// ────────────────────────────────────────────
+
+class BusinessDialog {
+    constructor() {
+        this.currentProvider = 'openai';  // 当前选用的提供商
+        this.keys   = {};   // { openai: 'sk-...', deepseek: '...', ... }
+        this.models = {};   // { openai: 'gpt-4o', ... }
+        this.history = [];
+        this.currentResult = '';
+        this.init();
+    }
+
+    init() {
+        this.loadAllConfig();
+        this.bindEvents();
+        this.renderHistory();
+        this.updateStatusBar();
+    }
+
+    // ── 存储 ──────────────────────────────────
+
+    loadAllConfig() {
+        // 加载每个提供商的 key 和 model
+        for (const p of Object.keys(PROVIDERS)) {
+            const key   = localStorage.getItem(`biz_key_${p}`) || '';
+            const model = localStorage.getItem(`biz_model_${p}`) || document.getElementById(`model-${p}`)?.value;
+            this.keys[p]   = key;
+            this.models[p] = model;
+            if (key) {
+                document.getElementById(`key-${p}`).value = key;
+                document.getElementById(`badge-${p}`).classList.add('visible');
+            }
+            if (model) {
+                const sel = document.getElementById(`model-${p}`);
+                if (sel) sel.value = model;
+            }
+        }
+        // 当前提供商
+        const saved = localStorage.getItem('biz_current_provider');
+        if (saved && PROVIDERS[saved]) this.currentProvider = saved;
+
+        // 历史
+        const h = localStorage.getItem('biz_history');
+        if (h) this.history = JSON.parse(h);
+    }
+
+    saveProvider(provider) {
+        const key   = document.getElementById(`key-${provider}`).value.trim();
+        const model = document.getElementById(`model-${provider}`).value;
+        if (!key) { this.toast('请输入 API Key', 'error'); return; }
+        this.keys[provider]   = key;
+        this.models[provider] = model;
+        localStorage.setItem(`biz_key_${provider}`,   key);
+        localStorage.setItem(`biz_model_${provider}`, model);
+        document.getElementById(`badge-${provider}`).classList.add('visible');
+        this.toast(`${PROVIDERS[provider].label} 配置已保存`, 'success');
+        this.updateStatusBar();
+    }
+
+    useProvider(provider) {
+        if (!this.keys[provider]) {
+            this.toast('请先保存该提供商的 API Key', 'error');
+            return;
+        }
+        this.currentProvider = provider;
+        localStorage.setItem('biz_current_provider', provider);
+        this.updateStatusBar();
+        this.toggleConfig();   // 收起面板
+        this.toast(`已切换到 ${PROVIDERS[provider].label}`, 'success');
+    }
+
+    // ── 界面事件 ──────────────────────────────
+
+    bindEvents() {
+        // 配置面板折叠
+        document.getElementById('configToggle').addEventListener('click', () => this.toggleConfig());
+
+        // 提供商标签页切换
+        document.getElementById('providerTabs').addEventListener('click', e => {
+            const tab = e.target.closest('.provider-tab');
+            if (!tab) return;
+            const provider = tab.dataset.provider;
+            document.querySelectorAll('.provider-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.provider-panel').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById(`panel-${provider}`).classList.add('active');
+        });
+
+        document.getElementById('analyzeBtn').addEventListener('click', () => this.analyze());
+        document.getElementById('clearBtn').addEventListener('click', () => this.clearInput());
+        document.getElementById('exportMdBtn').addEventListener('click', () => this.exportMarkdown());
+        document.getElementById('copyResultBtn').addEventListener('click', () => this.copyResult());
+        document.getElementById('closeModal').addEventListener('click', () => this.closeModal());
+        document.getElementById('modal').addEventListener('click', e => {
+            if (e.target.id === 'modal') this.closeModal();
+        });
+        document.getElementById('questionInput').addEventListener('keydown', e => {
+            if (e.ctrlKey && e.key === 'Enter') this.analyze();
+        });
+
+        // model select 实时保存
+        for (const p of Object.keys(PROVIDERS)) {
+            const sel = document.getElementById(`model-${p}`);
+            if (sel) sel.addEventListener('change', () => {
+                this.models[p] = sel.value;
+                localStorage.setItem(`biz_model_${p}`, sel.value);
+            });
+        }
+    }
+
+    toggleConfig() {
+        const content = document.getElementById('configContent');
+        const arrow   = document.getElementById('toggleArrow');
+        const isOpen  = content.classList.contains('open');
+        content.classList.toggle('open', !isOpen);
+        arrow.classList.toggle('open', !isOpen);
+    }
+
+    updateStatusBar() {
+        const dot  = document.getElementById('statusDot');
+        const text = document.getElementById('statusText');
+        const p    = this.currentProvider;
+        const hasKey = !!this.keys[p];
+        dot.classList.toggle('connected', hasKey);
+        text.textContent = hasKey
+            ? `${PROVIDERS[p].label} · ${this.models[p] || ''}`
+            : `未配置 API`;
+    }
+
+    // ── 分析主流程 ────────────────────────────
+
+    async analyze() {
+        const question = document.getElementById('questionInput').value.trim();
+        if (!question) { this.toast('请输入商业问题', 'error'); return; }
+
+        const p = this.currentProvider;
+        if (!this.keys[p]) {
+            this.toast('请先配置并保存 API Key', 'error');
+            document.getElementById('configContent').classList.add('open');
+            document.getElementById('toggleArrow').classList.add('open');
+            // 切到对应标签
+            document.querySelectorAll('.provider-tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.provider === p);
+            });
+            document.querySelectorAll('.provider-panel').forEach(panel => {
+                panel.classList.toggle('active', panel.id === `panel-${p}`);
+            });
+            return;
+        }
+
+        this.setLoading(true);
+        try {
+            const messages = [
+                { role: 'system', content: '你是一位专业的商业分析师，擅长分析各种商业问题并提供结构化的解决方案。请用中文回答，使用专业的商业术语，并提供可执行的建议。' },
+                { role: 'user',   content: this.buildPrompt(question) }
+            ];
+            const result = await PROVIDERS[p].call(this.keys[p], this.models[p], messages);
+            this.displayResult(result);
+            this.saveToHistory(question, result, p);
+        } catch (err) {
+            console.error(err);
+            this.toast('分析失败：' + err.message, 'error');
+        } finally {
+            this.setLoading(false);
+        }
+    }
+
+    buildPrompt(question) {
+        return `请分析以下商业问题，并按照以下结构提供专业回答：
+
+商业问题：${question}
+
+## 问题分析
+- 核心问题识别
+- 相关背景分析
+- 关键影响因素
+
+## 解决方案建议
+- 主要策略方向
+- 具体实施步骤
+- 预期效果评估
+
+## 风险提示
+- 潜在风险点
+- 风险规避建议
+- 应急预案
+
+## 后续行动计划
+- 短期行动项（1-3个月）
+- 中期规划（3-12个月）
+- 长期战略（1年以上）
+
+请使用专业的商业分析语言，确保回答结构清晰、内容实用。`;
+    }
+
+    // ── 结果渲染 ──────────────────────────────
+
+    displayResult(content) {
+        this.currentResult = content;
+        document.getElementById('resultContent').innerHTML = this.mdToHtml(content);
+        const sec = document.getElementById('resultSection');
+        sec.style.display = 'block';
+        sec.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    mdToHtml(md) {
+        return md
+            .replace(/^### (.+)$/gm, '<h5>$1</h5>')
+            .replace(/^## (.+)$/gm,  '<h4>$1</h4>')
+            .replace(/^# (.+)$/gm,   '<h3>$1</h3>')
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.+?)\*/g,     '<em>$1</em>')
+            .replace(/`(.+?)`/g,       '<code>$1</code>')
+            .replace(/^- (.+)$/gm,     '<li>$1</li>')
+            .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+            .replace(/\n{2,}/g, '</p><p>')
+            .replace(/\n/g, '<br>');
+    }
+
+    // ── 加载状态 ──────────────────────────────
+
+    setLoading(on) {
+        const btn     = document.getElementById('analyzeBtn');
+        const btnText = btn.querySelector('.btn-text');
+        const spinner = btn.querySelector('.loading-spinner');
+        btn.disabled = on;
+        btnText.style.display  = on ? 'none' : 'inline';
+        spinner.style.display  = on ? 'inline-flex' : 'none';
+    }
+
+    clearInput() {
+        document.getElementById('questionInput').value = '';
+        document.getElementById('resultSection').style.display = 'none';
+        this.currentResult = '';
+    }
+
+    // ── 导出 ──────────────────────────────────
+
+    exportMarkdown() {
+        if (!this.currentResult) { this.toast('没有可导出的内容', 'error'); return; }
+        const ts       = new Date().toLocaleString('zh-CN');
+        const question = document.getElementById('questionInput').value.trim();
+        const provider = PROVIDERS[this.currentProvider].label;
+        const model    = this.models[this.currentProvider];
+        const md = `# 商业问题分析报告
+
+**生成时间：** ${ts}
+**商业问题：** ${question}
+**分析模型：** ${provider} · ${model}
+
+---
+
+${this.currentResult}
+
+---
+*本报告由商业问题智能分析系统生成*`;
+        this.openModal('导出 Markdown', md, true);
+    }
+
+    copyResult() {
+        if (!this.currentResult) { this.toast('没有可复制的内容', 'error'); return; }
+        navigator.clipboard.writeText(this.currentResult)
+            .then(()  => this.toast('已复制到剪贴板', 'success'))
+            .catch(()  => this.toast('复制失败，请手动复制', 'error'));
+    }
+
+    // ── 历史记录 ──────────────────────────────
+
+    saveToHistory(question, answer, provider) {
+        this.history.unshift({
+            id: Date.now(),
+            question,
+            answer,
+            provider,
+            model: this.models[provider],
+            timestamp: new Date().toLocaleString('zh-CN'),
+            preview: question.slice(0, 50) + (question.length > 50 ? '…' : '')
+        });
+        if (this.history.length > 15) this.history = this.history.slice(0, 15);
+        localStorage.setItem('biz_history', JSON.stringify(this.history));
+        this.renderHistory();
+    }
+
+    renderHistory() {
+        const list = document.getElementById('historyList');
+        if (!this.history.length) {
+            list.innerHTML = '<div style="text-align:center;color:#aaa;padding:20px;font-size:0.9rem;">暂无历史记录</div>';
+            return;
+        }
+        list.innerHTML = this.history.map(item => `
+            <div class="history-item" onclick="app.loadHistoryItem(${item.id})">
+                <div class="question">${this.escHtml(item.preview)}</div>
+                <div class="meta">
+                    <span>${item.timestamp}</span>
+                    <span class="provider-badge">${item.provider ? PROVIDERS[item.provider]?.label || item.provider : ''}</span>
+                </div>
+            </div>`).join('');
+    }
+
+    loadHistoryItem(id) {
+        const item = this.history.find(h => h.id === id);
+        if (!item) return;
+        document.getElementById('questionInput').value = item.question;
+        this.displayResult(item.answer);
+        this.toast('已加载历史记录', 'success');
+    }
+
+    escHtml(str) {
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── 模态框 ────────────────────────────────
+
+    openModal(title, content, withActions) {
+        document.getElementById('modalTitle').textContent = title;
+        let html = `<div id="mdPreview" style="max-height:380px;overflow-y:auto;background:#f8f9fa;padding:15px;border-radius:6px;font-family:monospace;white-space:pre-wrap;font-size:0.85rem;">${this.escHtml(content)}</div>`;
+        if (withActions) {
+            html += `<div style="display:flex;gap:10px;margin-top:16px;">
+                <button class="btn btn-primary" style="flex:1" onclick="app.downloadMd()">下载 .md 文件</button>
+                <button class="btn btn-secondary" style="flex:1" onclick="app.copyMd()">复制内容</button>
+            </div>`;
+        }
+        document.getElementById('modalContent').innerHTML = html;
+        document.getElementById('modal').style.display = 'flex';
+        this._modalRaw = content;
+    }
+
+    closeModal() {
+        document.getElementById('modal').style.display = 'none';
+    }
+
+    downloadMd() {
+        const blob = new Blob([this._modalRaw], { type: 'text/markdown' });
+        const url  = URL.createObjectURL(blob);
+        const a    = Object.assign(document.createElement('a'), {
+            href: url,
+            download: `商业分析报告_${new Date().toISOString().split('T')[0]}.md`
+        });
+        a.click();
+        URL.revokeObjectURL(url);
+        this.toast('文件下载成功', 'success');
+    }
+
+    copyMd() {
+        navigator.clipboard.writeText(this._modalRaw)
+            .then(() => this.toast('内容已复制', 'success'));
+    }
+
+    // ── Toast 提示 ────────────────────────────
+
+    toast(msg, type) {
+        const el = document.createElement('div');
+        el.textContent = msg;
+        el.style.cssText = `
+            position:fixed;top:20px;right:20px;
+            padding:12px 20px;border-radius:6px;
+            color:white;font-weight:600;z-index:9999;
+            transition:opacity 0.3s,transform 0.3s;
+            background:${type === 'success' ? '#27ae60' : '#e74c3c'};`;
+        document.body.appendChild(el);
+        setTimeout(() => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateX(20px)';
+            setTimeout(() => el.remove(), 300);
+        }, 2800);
+    }
+}
+
+// 启动
+const app = new BusinessDialog();
+</script>
+</body>
+</html>
